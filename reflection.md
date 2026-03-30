@@ -7,11 +7,27 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+```
+the UML diagram has four classes: 
+1. Owner class: represents the user and their input data (pets).
+2. Pet class: Represents an individual pet with health and basic info
+3. Task class: Represents a single daily routine task.
+4. Scheduler class: Central manager coordinating all tasks and schedules. 
+
+- Each class has a single responsibilitiy.
+- relationships: Owner -> pet -> task (through scheduler)
+- supports multiple task types and pets
+- Tracking - completion status helps monitor per care adherence
+- Scalability - can handle multiple owners/pets. 
+```
+
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
-
+```
+Yes, my design evolved during implementation based on AI feedback. The original skeleton had no domain-specific error types, so the AI recommended adding three custom exception classes — `OwnershipError`, `TaskStateError`, and `ValidationError` — to give callers a way to distinguish between different failure modes (e.g., a pet not belonging to an owner vs. a task being in the wrong state vs. invalid input). Rather than raising a generic `ValueError` everywhere, each method now raises the exception that best describes what went wrong.
+```
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
