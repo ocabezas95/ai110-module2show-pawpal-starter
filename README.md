@@ -50,3 +50,19 @@ PawPal+ includes smarter scheduling tools that make daily pet-care planning more
 - **Task filtering:** Narrows task views by completion status and pet name for faster tracking.
 - **Recurring task automation:** Automatically generates the next daily/weekly task when a recurring item is completed.
 - **Conflict detection:** Flags overlapping tasks assigned to the same pet at the same date/time slot.
+
+## Testing PawPal+
+
+Run the test suite with:
+
+```bash
+python -m pytest
+```
+
+Main test categories:
+
+- **Sorting:** Verifies tasks are returned in correct chronological order for pet and date views, including same-time and unsorted input cases.
+- **Recurrence:** Confirms recurring behavior works for daily/weekly completion and recurring generation across weekday ranges.
+- **Conflict detection:** Ensures the scheduler reports true same-pet time collisions and avoids false conflicts for different pets.
+
+Confidence level (1-5 stars): ☆☆☆☆☆
