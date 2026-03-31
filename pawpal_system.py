@@ -116,6 +116,7 @@ class Task:
     status: TaskStatus = TaskStatus.PENDING
     completion_timestamp: Optional[datetime] = None
     reminder_minutes_before: Optional[int] = None
+    frequency: Optional[str] = None
 
     def mark_complete(self, timestamp: datetime) -> None:
         """Raise TaskStateError if not PENDING; set status and completion_timestamp."""
@@ -177,7 +178,8 @@ class Task:
             f"  Duration  : {self.duration_minutes} min\n"
             f"  Status    : {self.status.value}\n"
             f"  Completed : {completion}\n"
-            f"  Reminder  : {reminder}"
+            f"  Reminder  : {reminder}\n"
+            f"  Frequency : {self.frequency or 'none'}"
         )
 
     def set_reminder(self, time_before: int) -> None:
@@ -366,6 +368,7 @@ class Scheduler:
         scheduled_time: time,
         priority: Priority = Priority.MEDIUM,
         duration_minutes: int = 15,
+        frequency: Optional[str] = None,
         task_id: Optional[str] = None,
     ) -> Task:
         """Verify ownership, build Task (uuid4 id if none given), index it, return it."""
@@ -379,6 +382,7 @@ class Scheduler:
             scheduled_time=scheduled_time,
             priority=priority,
             duration_minutes=duration_minutes,
+            frequency=frequency,
         )
         self._index_task(task)
         return task
@@ -418,15 +422,77 @@ class Scheduler:
         tasks = [self._tasks_by_id[tid] for tid in task_ids if tid in self._tasks_by_id]
         return sorted(tasks, key=lambda t: (t.scheduled_date, t.scheduled_time))
 
+    def detect_conflicts(self) -> str:
+        """Return a warning string for tasks that share the same pet/date/time slot."""
+        grouped: dict[tuple[str, date, time], list[Task]] = {}
+        for task in self._tasks:
+            key = (task.pet_id, task.scheduled_date, task.scheduled_time)
+            grouped.setdefault(key, []).append(task)
+
+        conflicts = [
+            (key, tasks)
+            for key, tasks in grouped.items()
+            if len(tasks) > 1
+        ]
+        if not conflicts:
+            return "No scheduling conflicts detected."
+
+        lines = ["Warning: Scheduling conflicts detected:"]
+        for (pet_id, task_date, task_time), tasks in sorted(
+            conflicts,
+            key=lambda item: (item[0][1], item[0][2], item[0][0]),
+        ):
+            task_ids = ", ".join(sorted(task.task_id for task in tasks))
+            lines.append(
+                f"- Pet '{pet_id}' has {len(tasks)} tasks at "
+                f"{task_date} {task_time.strftime('%H:%M')} (task_ids: {task_ids})"
+            )
+        return "\n".join(lines)
+
     def get_tasks_for_date(self, target_date: date) -> list[Task]:
         """Look up task ids in _task_ids_by_date; return sorted by scheduled_time."""
         task_ids = self._task_ids_by_date.get(target_date, set())
         tasks = [self._tasks_by_id[tid] for tid in task_ids if tid in self._tasks_by_id]
         return sorted(tasks, key=lambda t: t.scheduled_time)
 
+    def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+        """Return tasks sorted by scheduled time."""
+        return sorted(tasks, key=lambda t: t.scheduled_time)
+
     def get_today_tasks(self) -> list[Task]:
         """Delegate to get_tasks_for_date(date.today())."""
         return self.get_tasks_for_date(date.today())
+
+    def filter_tasks(
+        self,
+        is_complete: Optional[bool] = None,
+        pet_name: Optional[str] = None,
+    ) -> list[Task]:
+        """Filter tasks by completion status and/or pet name.
+
+        Args:
+            is_complete: True for completed tasks, False for incomplete tasks,
+                None to ignore completion status.
+            pet_name: Pet name to filter by (case-insensitive), None to ignore pet.
+        """
+        filtered = list(self._tasks)
+
+        if is_complete is not None:
+            if is_complete:
+                filtered = [t for t in filtered if t.status == TaskStatus.COMPLETED]
+            else:
+                filtered = [t for t in filtered if t.status != TaskStatus.COMPLETED]
+
+        if pet_name is not None:
+            normalized_name = pet_name.strip().lower()
+            matching_pet_ids = {
+                pet.pet_id
+                for pet in self._owner.get_all_pets()
+                if pet.name.lower() == normalized_name
+            }
+            filtered = [t for t in filtered if t.pet_id in matching_pet_ids]
+
+        return sorted(filtered, key=lambda t: (t.scheduled_date, t.scheduled_time))
 
     def get_overdue_tasks(self) -> list[Task]:
         """Return PENDING tasks whose scheduled datetime is before now (UTC), oldest first."""
@@ -446,10 +512,33 @@ class Scheduler:
             and start <= task.scheduled_date <= end
         ]
 
-    def complete_task(self, task_id: str) -> None:
-        """Find task, call mark_complete with datetime.now(timezone.utc)."""
+    def mark_task_complete(self, task_id: str) -> None:
+        """Mark task complete and auto-create the next recurring task instance."""
         task = self._find_task_or_raise(task_id)
         task.mark_complete(datetime.now(timezone.utc))
+
+        frequency_offsets = {
+            "daily": 1,
+            "weekly": 7,
+        }
+
+        recurrence_days = frequency_offsets.get((task.frequency or "").lower())
+        if recurrence_days is not None:
+            next_due_date = task.scheduled_date + timedelta(days=recurrence_days)
+            self.create_task(
+                pet_id=task.pet_id,
+                task_type=task.task_type,
+                description=task.description,
+                scheduled_date=next_due_date,
+                scheduled_time=task.scheduled_time,
+                priority=task.priority,
+                duration_minutes=task.duration_minutes,
+                frequency=task.frequency,
+            )
+
+    def complete_task(self, task_id: str) -> None:
+        """Backward-compatible alias for mark_task_complete()."""
+        self.mark_task_complete(task_id)
 
     def reschedule_task(
         self, task_id: str, new_date: date, new_time: time
