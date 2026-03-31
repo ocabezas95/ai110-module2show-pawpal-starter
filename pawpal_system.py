@@ -61,16 +61,20 @@ class Pet:
     birth_date: date          # source of truth — do NOT store age as a field
     owner_id: str
     medications: list[str] = field(default_factory=list)
+    notes: str = ""
 
     def get_info(self) -> str:
         """Return a formatted summary string of this pet's details."""
         age = self.get_age()
         med_status = "Yes" if self.is_on_medication() else "No"
-        return (
+        info = (
             f"Pet: {self.name} ({self.species}, {self.breed})\n"
             f"  Age: {age} year(s)  |  Weight: {self.weight} lbs\n"
             f"  On medication: {med_status}"
         )
+        if self.notes:
+            info += f"\n  Notes: {self.notes}"
+        return info
 
     def update_weight(self, new_weight: float) -> None:
         """Validate new_weight > 0, then update self.weight."""
@@ -437,17 +441,32 @@ class Scheduler:
         if not conflicts:
             return "No scheduling conflicts detected."
 
-        lines = ["Warning: Scheduling conflicts detected:"]
+        lines = ["Scheduling conflicts detected:"]
         for (pet_id, task_date, task_time), tasks in sorted(
             conflicts,
             key=lambda item: (item[0][1], item[0][2], item[0][0]),
         ):
-            task_ids = ", ".join(sorted(task.task_id for task in tasks))
+            pet = self._owner.get_pet_by_id(pet_id)
+            pet_label = pet.name if pet else pet_id
+            task_descs = ", ".join(sorted(t.description for t in tasks))
             lines.append(
-                f"- Pet '{pet_id}' has {len(tasks)} tasks at "
-                f"{task_date} {task_time.strftime('%H:%M')} (task_ids: {task_ids})"
+                f"- {pet_label} has {len(tasks)} tasks at "
+                f"{task_date} {task_time.strftime('%H:%M')} ({task_descs})"
             )
         return "\n".join(lines)
+
+    def detect_conflict_task_ids(self) -> set[str]:
+        """Return the set of task_ids that participate in a scheduling conflict."""
+        grouped: dict[tuple[str, date, time], list[Task]] = {}
+        for task in self._tasks:
+            key = (task.pet_id, task.scheduled_date, task.scheduled_time)
+            grouped.setdefault(key, []).append(task)
+        conflict_ids: set[str] = set()
+        for tasks in grouped.values():
+            if len(tasks) > 1:
+                for t in tasks:
+                    conflict_ids.add(t.task_id)
+        return conflict_ids
 
     def get_tasks_for_date(self, target_date: date) -> list[Task]:
         """Look up task ids in _task_ids_by_date; return sorted by scheduled_time."""
@@ -520,6 +539,8 @@ class Scheduler:
         frequency_offsets = {
             "daily": 1,
             "weekly": 7,
+            "biweekly": 14,
+            "monthly": 30,
         }
 
         recurrence_days = frequency_offsets.get((task.frequency or "").lower())

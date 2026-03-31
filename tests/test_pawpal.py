@@ -408,9 +408,10 @@ def test_conflict_detection_flags_two_tasks_at_exact_same_time(scheduler_with_on
     )
 
     conflict_report = scheduler.detect_conflicts()
-    assert "Warning: Scheduling conflicts detected:" in conflict_report
-    assert "Pet 'p1' has 2 tasks at 2026-04-06 09:00" in conflict_report
-    assert "task_ids: c1, c2" in conflict_report
+    assert "Scheduling conflicts detected:" in conflict_report
+    assert "Buddy has 2 tasks at 2026-04-06 09:00" in conflict_report
+    assert "Meal" in conflict_report
+    assert "Pill" in conflict_report
 
 
 def test_conflict_detection_no_conflicts_returns_clear_message(scheduler_with_one_pet):
