@@ -78,8 +78,6 @@ When the app opens, you can add pets, assign tasks, edit schedules, mark tasks c
 
 ## Smarter Scheduling
 
-Phase 4 introduced scheduling features focused on real-world usability and reliability:
-
 - **Time-based sorting** so tasks appear in execution order.
 - **Task filtering** by completion status and pet name.
 - **Recurring completion behavior** for daily/weekly routines.
@@ -119,7 +117,7 @@ What is covered:
 ![PawPal+ demo screenshot placeholder](images/Screenshot%202026-03-30%20at%2011.45.57 PM.png)
 ![PawPal+ demo screenshot placeholder](images/Screenshot%202026-03-31%20at%2012.14.07 AM.png)
 ![PawPal+ demo screenshot placeholder](images/Screenshot%202026-03-31%20at%2012.16.18 AM.png)
-![PawPal+ demo screenshot placeholder]
+
 
 
 
